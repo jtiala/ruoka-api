@@ -25,6 +25,10 @@ group :development, :test do
 	gem 'dotenv-rails'
 	# Call 'byebug' anywhere in the code to stop execution and get a debugger console
 	gem 'byebug', platform: :mri
+	# Use RSpec for specs
+	gem 'rspec-rails', '>= 3.5.0'
+	# Use Factory Girl for generating random test data
+	gem 'factory_girl_rails'
 end
 
 group :development do
