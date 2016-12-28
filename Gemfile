@@ -23,6 +23,12 @@ gem 'puma', '~> 3.0'
 # Use AMS for serialization
 gem 'active_model_serializers'
 
+# Use whenever for scheduling
+gem 'whenever', :require => false
+
+# Use sidekiq for background processing
+gem 'sidekiq'
+
 group :development, :test do
 	# Use dotenv for development environment variables
 	gem 'dotenv-rails'
