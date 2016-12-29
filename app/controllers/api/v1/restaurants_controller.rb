@@ -4,7 +4,7 @@ module Api::V1
 
 		# GET /restaurants
 		def index
-			@restaurants = Restaurant.all
+			@restaurants = Restaurant.order(:chain, :name)
 
 			render json: @restaurants
 		end

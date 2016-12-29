@@ -4,7 +4,7 @@ module Api::V1
 
 		# GET /menu_items
 		def index
-			@menu_items = MenuItem.all
+			@menu_items = MenuItem.order(:menu_id, :weight)
 
 			render json: @menu_items
 		end

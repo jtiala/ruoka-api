@@ -4,7 +4,7 @@ module Api::V1
 
 		# GET /menus
 		def index
-			@menus = Menu.all
+			@menus = Menu.order(:restaurant_id, :date)
 
 			render json: @menus
 		end

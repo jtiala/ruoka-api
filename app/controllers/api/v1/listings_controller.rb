@@ -4,7 +4,7 @@ module Api::V1
 
 		# GET /listings
 		def index
-			@listings = Listing.all
+			@listings = Listing.order(:list_id, :weight)
 
 			render json: @listings
 		end
