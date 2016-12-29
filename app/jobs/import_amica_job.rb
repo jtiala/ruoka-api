@@ -5,11 +5,11 @@ class ImportAmicaJob < ApplicationJob
 	queue_as :default
 
 	@@languages = ['fi', 'en']
-	@@date_range = ((Date.today - 10)..(Date.today + 10)) # temporary solution
 	@@url = 'http://www.amica.fi/modules/json/json/Index?costNumber=%s&language=%s&firstDay=%s'
 
-	def perform(*args)
-		dates = get_dates(@@date_range)
+	def perform(start_date, end_date)
+		date_range = (Date.parse(start_date) .. Date.parse(end_date))
+		dates = get_dates(date_range)
 		restaurants = Restaurant.where(chain: 'Amica')
 
 		@@languages.each do |language|
@@ -34,65 +34,67 @@ class ImportAmicaJob < ApplicationJob
 										rescue ArgumentError => e
 											# Date is invalid, do nothing
 										else
-											menu = Menu.where(restaurant: restaurant, date: menu_date, language: language).first_or_initialize
-											menu.lunch_time = daily_menu_data['LunchTime'].to_s if daily_menu_data.key?('LunchTime')
-											menu.save
+											if date_range.include?(menu_date)
+												menu = Menu.where(restaurant: restaurant, date: menu_date, language: language).first_or_initialize
+												menu.lunch_time = daily_menu_data['LunchTime'].to_s if daily_menu_data.key?('LunchTime')
+												menu.save
 
-											menu_items = []
+												menu_items = []
 
-											if daily_menu_data.key?('SetMenus') && daily_menu_data['SetMenus'].respond_to?('each')
-												count = 0
-												daily_menu_data['SetMenus'].each do |set_menu_data|
-													if set_menu_data.key?('Name') && ! set_menu_data['Name'].empty?
-														menu_item = {name: set_menu_data['Name'].to_s}
+												if daily_menu_data.key?('SetMenus') && daily_menu_data['SetMenus'].respond_to?('each')
+													count = 0
+													daily_menu_data['SetMenus'].each do |set_menu_data|
+														if set_menu_data.key?('Name') && ! set_menu_data['Name'].empty?
+															menu_item = {name: set_menu_data['Name'].to_s}
 
-														if set_menu_data.key?('Price')
-															menu_item[:price] = set_menu_data['Price'].to_s
-														else
-															menu_item[:price] = nil
-														end
+															if set_menu_data.key?('Price')
+																menu_item[:price] = set_menu_data['Price'].to_s
+															else
+																menu_item[:price] = nil
+															end
 
-														if set_menu_data.key?('SortOrder')
-															menu_item[:sort_order] = set_menu_data['SortOrder'].to_i
-														else
-															menu_item[:sort_order] = 0
-														end
+															if set_menu_data.key?('SortOrder')
+																menu_item[:sort_order] = set_menu_data['SortOrder'].to_i
+															else
+																menu_item[:sort_order] = 0
+															end
 
-														menu_item[:components] = []
-														if set_menu_data.key?('Components') && set_menu_data['Components'].respond_to?('each')
-															set_menu_data['Components'].each do |component_data|
-																unless component_data.empty?
-																	menu_item[:components].push({name: component_data.to_s})
+															menu_item[:components] = []
+															if set_menu_data.key?('Components') && set_menu_data['Components'].respond_to?('each')
+																set_menu_data['Components'].each do |component_data|
+																	unless component_data.empty?
+																		menu_item[:components].push({name: component_data.to_s})
+																	end
 																end
 															end
+
+															menu_item[:count] = count
+															count = count + 1
+
+															menu_items.push(menu_item)
 														end
-
-														menu_item[:count] = count
-														count = count + 1
-
-														menu_items.push(menu_item)
 													end
 												end
-											end
 
-											menu_items.sort! { |a, b| [a[:sort_order], a[:count]] <=> [b[:sort_order], b[:count]] }
-											weight = 0
-											menu_items.each do |menu_item|
-												menu_item[:weight] = weight
-												menu_item.delete(:sort_order)
-												menu_item.delete(:count)
-												weight = weight + 1
-											end
-
-											valid_items = []
-											menu_items.each do |menu_item|
-												unless menu_item.empty?
-													item = MenuItem.where(menu: menu, name: menu_item[:name], price: menu_item[:price], components: menu_item[:components], weight: menu_item[:weight]).first_or_create
-													valid_items.push(item.id)
+												menu_items.sort! { |a, b| [a[:sort_order], a[:count]] <=> [b[:sort_order], b[:count]] }
+												weight = 0
+												menu_items.each do |menu_item|
+													menu_item[:weight] = weight
+													menu_item.delete(:sort_order)
+													menu_item.delete(:count)
+													weight = weight + 1
 												end
-											end
 
-											MenuItem.where.not(id: valid_items).where(menu: menu).destroy_all
+												valid_items = []
+												menu_items.each do |menu_item|
+													unless menu_item.empty?
+														item = MenuItem.where(menu: menu, name: menu_item[:name], price: menu_item[:price], components: menu_item[:components], weight: menu_item[:weight]).first_or_create
+														valid_items.push(item.id)
+													end
+												end
+
+												MenuItem.where.not(id: valid_items).where(menu: menu).destroy_all
+											end
 										end
 									end
 								end
