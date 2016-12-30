@@ -22,6 +22,7 @@
 .env.test
 .env.production
 
-# Ignore macOS and Windows config files
+# Ignore macOS and Windows config files and .swp files
 .DS_Store
 desktop.ini
+.swp

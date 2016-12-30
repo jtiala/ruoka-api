@@ -7,8 +7,20 @@ class ImportAmicaJob < ApplicationJob
 	@@languages = ['fi', 'en']
 	@@url = 'http://www.amica.fi/modules/json/json/Index?costNumber=%s&language=%s&firstDay=%s'
 
-	def perform(start_date, end_date)
-		date_range = (Date.parse(start_date) .. Date.parse(end_date))
+	def perform(start_date = nil, end_date = nil)
+		if start_date.nil?
+			start_date = Date.today.beginning_of_week
+		else
+			start_date = Date.parse(start_date)
+		end
+
+		if end_date.nil?
+			end_date = start_date + 14
+		else
+			end_date = Date.parse(end_date)
+		end
+		
+		date_range = (start_date .. end_date)
 		dates = get_dates(date_range)
 		restaurants = Restaurant.where(chain: 'Amica')
 
