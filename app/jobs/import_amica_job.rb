@@ -19,7 +19,7 @@ class ImportAmicaJob < ApplicationJob
 		else
 			end_date = Date.parse(end_date)
 		end
-		
+
 		date_range = (start_date .. end_date)
 		dates = get_dates(date_range)
 		restaurants = Restaurant.where(chain: 'Amica')
@@ -31,7 +31,7 @@ class ImportAmicaJob < ApplicationJob
 						menu_data = get_menu(restaurant.download_identifier, language, date.strftime("%Y-%-m-%-d"))
 						unless menu_data.empty?
 							if menu_data.key?('RestaurantUrl')
-								restaurant.url = menu_data['RestaurantUrl'].to_s
+								restaurant.url = menu_data['RestaurantUrl'].to_s.strip!
 								restaurant.save
 							end
 
@@ -48,7 +48,7 @@ class ImportAmicaJob < ApplicationJob
 										else
 											if date_range.include?(menu_date)
 												menu = Menu.where(restaurant: restaurant, date: menu_date, language: language).first_or_initialize
-												menu.lunch_time = daily_menu_data['LunchTime'].to_s if daily_menu_data.key?('LunchTime')
+												menu.lunch_time = normalize_time(daily_menu_data['LunchTime']) if daily_menu_data.key?('LunchTime')
 												menu.save
 
 												menu_items = []
@@ -56,35 +56,39 @@ class ImportAmicaJob < ApplicationJob
 												if daily_menu_data.key?('SetMenus') && daily_menu_data['SetMenus'].respond_to?('each')
 													count = 0
 													daily_menu_data['SetMenus'].each do |set_menu_data|
+														menu_item = {}
 														if set_menu_data.key?('Name') && ! set_menu_data['Name'].empty?
-															menu_item = {name: set_menu_data['Name'].to_s}
+															name = normalize_name(set_menu_data['Name'])
+															menu_item[:name] = name
+															tag = get_tag_from_name(name)
+															menu_item[:tags] = tag
+														end
 
-															if set_menu_data.key?('Price')
-																menu_item[:price] = set_menu_data['Price'].to_s
-															else
-																menu_item[:price] = nil
-															end
+														if set_menu_data.key?('Price')
+															menu_item[:price] = normalize_price(set_menu_data['Price'])
+														else
+															menu_item[:price] = nil
+														end
 
-															if set_menu_data.key?('SortOrder')
-																menu_item[:sort_order] = set_menu_data['SortOrder'].to_i
-															else
-																menu_item[:sort_order] = 0
-															end
+														if set_menu_data.key?('SortOrder')
+															menu_item[:sort_order] = set_menu_data['SortOrder'].to_i
+														else
+															menu_item[:sort_order] = 0
+														end
 
-															menu_item[:components] = []
-															if set_menu_data.key?('Components') && set_menu_data['Components'].respond_to?('each')
-																set_menu_data['Components'].each do |component_data|
-																	unless component_data.empty?
-																		menu_item[:components].push({name: component_data.to_s})
-																	end
+														menu_item[:components] = []
+														if set_menu_data.key?('Components') && set_menu_data['Components'].respond_to?('each')
+															set_menu_data['Components'].each do |component_data|
+																unless component_data.empty?
+																	menu_item[:components].push({name: normalize_name(component_data)})
 																end
 															end
-
-															menu_item[:count] = count
-															count = count + 1
-
-															menu_items.push(menu_item)
 														end
+
+														menu_item[:count] = count
+														count = count + 1
+
+														menu_items.push(menu_item)
 													end
 												end
 
@@ -100,7 +104,7 @@ class ImportAmicaJob < ApplicationJob
 												valid_items = []
 												menu_items.each do |menu_item|
 													unless menu_item.empty?
-														item = MenuItem.where(menu: menu, name: menu_item[:name], price: menu_item[:price], components: menu_item[:components], weight: menu_item[:weight]).first_or_create
+														item = MenuItem.where(menu: menu, name: menu_item[:name], price: menu_item[:price], components: menu_item[:components], tags: menu_item[:tags], weight: menu_item[:weight]).first_or_create
 														valid_items.push(item.id)
 													end
 												end
